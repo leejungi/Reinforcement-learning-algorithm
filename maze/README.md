@@ -6,4 +6,8 @@ If you want to input your maze, then use load in Environment.py
 # Result
 Q-learning vs SARSA
 If the size of maze increases, Q-learning is hard to find the path. So i change 'epilson' to 'epilson*iteration/num_episode' in epilson-greedy method. Then Q-learning can find the optimal path. 
+
 SARSA can find path from start to end point without changing epilson. But it needs more cycles to find the optimal path. 
+
+# MC
+Monte carlo is better than SARSA. I think this is because Monte carlo is unbiased. But if the Maze size increase, MC takes longer time to training Maze.

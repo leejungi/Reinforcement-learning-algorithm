@@ -5,6 +5,8 @@ class Maze:
 	def __init__(self, height=10, width=10):
 		self.height = height
 		self.width = width
+
+		#Make maze(Bug: the start point can be closed by the wall)
 		self.maze = np.zeros((self.height,self.width))
 		self.wall = [[random.randrange(0,self.height), random.randrange(0,self.width)] for i in range(min(self.height,self.width))]
 		self.start = [0,0]
@@ -59,6 +61,7 @@ class Maze:
 		lines = f.readlines()
 
 		self.maze =[]
+		self.wall = []
 
 		for n, line in enumerate(reversed(lines)):
 			w=[]
@@ -67,6 +70,8 @@ class Maze:
 					self.start= [n,i]
 				elif int(line[i]) == 3:
 					self.end = [n,i]
+				elif int(line[i]) == 1:
+					self.wall.append([n,i])
 
 				w.append(int(line[i]))
 

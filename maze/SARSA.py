@@ -1,6 +1,7 @@
 from Environment import *
 import random
 import matplotlib.pyplot as plt
+import math
 
 class SARSA_policy:
 	def __init__(self, height =10, width =10):
@@ -11,6 +12,7 @@ class SARSA_policy:
 		self.learning_rate = 0.01
 		self.discount_factor = 0.9
 
+	#Need 'next_action' comparing with Q-learning
 	def learn(self,state, action, reward, next_state, next_action):
 
 		q = self.q_table[state[0]][state[1]][action]
@@ -45,6 +47,7 @@ if __name__ =="__main__":
 	num_episode = 50000
 	max_step = 10000
 	epsilon = 0.7
+	discount_factor = 0.9
 
 	G_list =[0 for i in range(num_episode)]
 
@@ -52,12 +55,10 @@ if __name__ =="__main__":
 	for i in range(num_episode):
 		maze.reset()
 
-		right_list=[]
 		for j in range(max_step):
 			state = maze.get_state()
 
 			action = policy.get_action(state, epsilon)
-			right_list.append(action)
 
 			next_state, reward, done = maze.step(action)
 
@@ -66,6 +67,7 @@ if __name__ =="__main__":
 			policy.learn(state, action, reward, next_state, next_action)
 			
 			G_list[i] +=reward
+#			G_list[i] += math.pow(discount_factor,j) * reward
 
 			if done == True:
 				break
@@ -86,7 +88,6 @@ if __name__ =="__main__":
 
 		next_action = policy.get_action(next_state, 1)
 
-		policy.learn(state, action, reward, next_state, next_action)
 		
 		Total_reward +=reward
 
