@@ -1,15 +1,11 @@
 # Cartpole
-Cartpole-v0: max step=200
-
-Cartpole-v1: max step=200
-
+Cartpole-v0: max step=200  
+Cartpole-v1: max step=200  
 To increase max step, use 'env._max_episode_steps = 1000'
 
 # 13DQN
-Q(s,a) = DQN(s)
-
-loss = (Q(s,a) - TD_target)^2
-
+Q(s,a) = DQN(s)  
+loss = (Q(s,a) - TD_target)^2  
 TD_target = Reward + discount_factor*argmax(Q(n_s,n_a))
 
 Experience when i make cartpole DQN code
