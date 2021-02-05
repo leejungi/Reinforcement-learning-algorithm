@@ -5,4 +5,7 @@
 3. Monte Carlo
 4. REINFORCEMENT
 
+# Cartpole
+1. 13DQN  
+2. 15DQN
 

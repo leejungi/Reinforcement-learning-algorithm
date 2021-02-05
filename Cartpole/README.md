@@ -11,7 +11,7 @@ TD_target = Reward + discount_factor*argmax(Q(n_s,n_a))
 
 Experience when i make cartpole DQN code
 1. Done reward = -100 is important when i use reward = -1, it is hard to train.
-2. Becareful about loss(Crossentropy doesn't work)
+2. Becareful about loss(Crossentropy doesn't work) -> debugging label shape make trouble
 3. Torch Tensor is important. Torch DNN input and model should be same device.
 4. When sampling state from replay memory, output of slicing using numpy is object not floating array. So this can't be converted into torch.Tensor. Use np.stack to make object to floating array.
 
@@ -21,4 +21,15 @@ Q(n_s,n_a) = Target_DQN(n_s)
 loss = (Q(s,a) - TD_target)^2  
 TD_target = Reward + discount_factor*argmax(Q(n_s,n_a))
 
+Experience
+1. Replay memory size is important 
+2. it may takes long time to learn cartpole but sometimes it takes 250 step for 10000 max epsiode step.
+3. when hidden layer size was 32 or 64, it is hard to learn. But which 3 hidden layer makes easy to learn.
+4. Exploration is important. Depending on exploration, DQN can learn within 250~3000 episode.
+
 # DDQN
+
+Comparing 13 DQN vs 15 DQN
+15 DQN can learn 10000 step environment. 
+13 DQN is hard to learn 10000 but can learn 500 environment.
+
