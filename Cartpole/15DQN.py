@@ -19,20 +19,26 @@ class DQN:
         self.epsilon_decay = 0.999
         self.epsilon_min = 0.01
         self.discount_factor = 0.99
-        self.learning_rate=0.0005
-        self.batch_size= 128
+        self.learning_rate=0.001 #0.001
+        self.batch_size= 64
         
         self.num_step =0
         self.num_exploration = 0
+        self.num_train = 0
+        self.model_update_interval = 10
         
         self.train_start = 1000
-        self.replay_memory_size = 50000#2000
+        self.replay_memory_size = 10000
         self.replay_memory = deque(maxlen=self.replay_memory_size)        
         
         #model define
+        #action-value function
         self.model = MLP(self.n_state, self.n_action).to(self.device)        
         self.loss = nn.MSELoss().to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        
+        #target action-value function
+        self.target_model = MLP(self.n_state, self.n_action).to(self.device)  
         
     def reset_params(self):
         self.num_step =0
@@ -80,7 +86,8 @@ class DQN:
     #Update
     def train(self):
 
-
+        self.num_train += 1
+        
         mini_batch = random.sample(self.replay_memory, self.batch_size)
         mini_batch = np.array(mini_batch)
         
@@ -113,7 +120,7 @@ class DQN:
         # T_q = torch.stack([T_q[i][T_actions[i]] for i in range(self.batch_size)])
 
         
-        T_next_q = self.model(T_next_states)
+        T_next_q = self.target_model(T_next_states)
         T_next_q = torch.max(T_next_q,-1)[0]
         TD_target = torch.zeros((self.batch_size, self.n_action)).to(self.device)
         
@@ -128,18 +135,22 @@ class DQN:
         cost = self.loss(T_q, TD_target).mean()
         cost.backward()#Gradient calculation
         self.optimizer.step()#Gradient update
-            
+        
+        if self.num_train%self.model_update_interval == 0:
+            self.target_model.load_state_dict(self.model.state_dict())
         
         
 class MLP(nn.Module):
     def __init__(self,n_state, n_action):
         super(MLP, self).__init__()
         self.layers = nn.Sequential(
-            nn.Linear(n_state, 32),
+            nn.Linear(n_state, 16),
             nn.ReLU(),
-            nn.Linear(32, 32),
+            nn.Linear(16, 16),
             nn.ReLU(),
-            nn.Linear(32, n_action)
+            nn.Linear(16, 16),
+            nn.ReLU(),
+            nn.Linear(16, n_action)
         )       
         
     def forward(self, x):        
@@ -160,8 +171,9 @@ if __name__ =="__main__":
     env = gym.make('CartPole-v0')
     
     env._max_episode_steps = 10000
-    save_path='13DQN.pth'
+    save_path='15DQN.pth'
     num_episode = 5000
+    
     
     n_state = env.observation_space.shape[0]
     n_action = env.action_space.n
@@ -178,11 +190,12 @@ if __name__ =="__main__":
         state = np.reshape(state, [-1])    
         
         policy.reset_params()
-        
+
         step = 0
         for t in range(max_step):  
             # env.render()
-    
+            
+
             action = policy.get_action(state)
             next_state, reward, done, _ = env.step(action)            
             
@@ -195,7 +208,7 @@ if __name__ =="__main__":
 
             state = next_state
             
-            if len(policy.replay_memory) >= policy.batch_size:   
+            if len(policy.replay_memory) >= policy.batch_size:  
                 policy.epsilon_update()
                 policy.train()
                 
@@ -212,7 +225,7 @@ if __name__ =="__main__":
         
     policy.save_model(save_path)
     
-    plt.plot(step_list)
+    plt.plot([i for i in range(len(step_list))],step_list)
     plt.show()
     
     

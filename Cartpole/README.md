@@ -5,6 +5,7 @@ To increase max step, use 'env._max_episode_steps = 1000'
 
 # 13DQN
 Q(s,a) = DQN(s)  
+Q(n_s,n_a) = DQN(n_s)
 loss = (Q(s,a) - TD_target)^2  
 TD_target = Reward + discount_factor*argmax(Q(n_s,n_a))
 
@@ -15,4 +16,9 @@ Experience when i make cartpole DQN code
 4. When sampling state from replay memory, output of slicing using numpy is object not floating array. So this can't be converted into torch.Tensor. Use np.stack to make object to floating array.
 
 # 15DQN
+Q(s,a) = DQN(s)  
+Q(n_s,n_a) = Target_DQN(n_s)
+loss = (Q(s,a) - TD_target)^2  
+TD_target = Reward + discount_factor*argmax(Q(n_s,n_a))
+
 # DDQN
