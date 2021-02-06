@@ -7,5 +7,6 @@
 
 # Cartpole
 1. 13DQN  
-2. 15DQN
+2. 15DQN  
+3. DDQN
 
