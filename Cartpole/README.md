@@ -17,9 +17,9 @@ Experience when i make cartpole DQN code
 
 # 15DQN
 Q(s,a) = DQN(s)  
-Q(n_s,n_a) = Target_DQN(n_s)
+Q'(n_s,n_a) = Target_DQN(n_s)  
 loss = (Q(s,a) - TD_target)^2  
-TD_target = Reward + discount_factor*argmax(Q(n_s,n_a))
+TD_target = Reward + discount_factor*argmax(Q'(n_s,n_a))
 
 Experience
 1. Replay memory size is important 
@@ -28,8 +28,19 @@ Experience
 4. Exploration is important. Depending on exploration, DQN can learn within 250~3000 episode.
 
 # DDQN
+Q(s,a) = DQN(s)  
+Q'(n_s,n_a) = Target_DQN(n_s)  
+loss = (Q(s,a) - TD_target)^2  
+TD_target = Reward + discount_factor*Q'(n_s, argmax(Q(n_s,n_a)))
 
-Comparing 13 DQN vs 15 DQN
-15 DQN can learn 10000 step environment. 
+Pick action in model(Q) by argmax.  
+This action index is used in target model Q value to pick action.
+
+Experience
+1. DDQN works with changing TD_target in 15DQN. But i don't know DDQN is better than DQN. Because it shows similar performance comparing to 15DQN. This may be affected by exploration. Because the result is different in every time.
+
+# Result
+Comparing 13 DQN vs 15 DQN  
+15 DQN can learn 10000 step environment.   
 13 DQN is hard to learn 10000 but can learn 500 environment.
 
