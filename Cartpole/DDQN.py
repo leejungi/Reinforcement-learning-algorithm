@@ -8,8 +8,8 @@ import numpy as np
 import random
 import gym
 import matplotlib.pyplot as plt
-
-class DQN:
+import copy
+class DDQN:
     def __init__(self,n_state, n_action, device='cpu'):
         #params
         self.n_state = n_state
@@ -116,17 +116,16 @@ class DQN:
         T_next_states = torch.FloatTensor(T_next_states).to(self.device)
         T_dones = torch.FloatTensor(T_dones).to(self.device)
         
-        T_q = self.model(T_states)
-        #_ shows max value, T_next_q shows index of max value
-        _, T_next_q = T_q.max(1)
-        
+        T_q = self.model(T_states)        
+        # TD_target = self.model(T_states)
 
         
-        T_next_tq = self.target_model(T_next_states)
+        #_ shows max value, T_next_q shows index of max value
+        _, T_next_q = self.model(T_next_states).detach().max(1)
+       
+        T_next_tq = self.target_model(T_next_states).detach()
         T_next_tq = T_next_tq.gather(1, T_next_q.unsqueeze(1))
         T_next_a = T_next_tq.squeeze()
-
-        
 
         TD_target = torch.zeros((self.batch_size, self.n_action)).to(self.device)
         
@@ -134,9 +133,7 @@ class DQN:
         for i in range(self.batch_size):
             TD_target[i][T_actions[i]] = T_rewards[i] + self.discount_factor*(1. - T_dones[i]) *T_next_a[i]
 
-        TD_target = TD_target.detach()
-        
-        
+        TD_target = TD_target.detach()       
         
         self.optimizer.zero_grad()        
         cost = self.loss(T_q, TD_target).mean()
@@ -151,19 +148,37 @@ class MLP(nn.Module):
     def __init__(self,n_state, n_action):
         super(MLP, self).__init__()
         self.layers = nn.Sequential(
-            nn.Linear(n_state, 16),
+            nn.Linear(n_state, 24),
             nn.ReLU(),
-            nn.Linear(16, 16),
+            nn.Linear(24, 24),
             nn.ReLU(),
-            nn.Linear(16, 16),
-            nn.ReLU(),
-            nn.Linear(16, n_action)
+            # nn.Linear(16, 16),
+            # nn.ReLU(),
+            nn.Linear(24, n_action)
         )       
         
     def forward(self, x):        
         return self.layers(x)
     
-
+def test(policy, env, save_path=None,rendering=False):
+    if save_path != None:
+        policy.load_model(save_path)
+    state = env.reset()
+    state = np.reshape(state, [-1])      
+    max_step = env._max_episode_steps
+    step =0
+    with torch.no_grad():
+        for t in range(max_step):
+            if rendering == True:
+                env.render()
+            action = policy.get_action(state, True)
+            next_state, reward, done, _ = env.step(action)
+            
+            step +=1
+            state = next_state
+            if done:            
+                break
+    return step
 
 if __name__ =="__main__":
     device= 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -178,7 +193,7 @@ if __name__ =="__main__":
     env = gym.make('CartPole-v0')
     
     env._max_episode_steps = 10000
-    save_path='15DQN.pth'
+    save_path='DDQN.pth'
     num_episode = 5000
     
     
@@ -187,7 +202,7 @@ if __name__ =="__main__":
     max_step = env._max_episode_steps
 
 
-    policy = DQN(n_state, n_action, device)
+    policy = DDQN(n_state, n_action, device)
     step_list = []
 
     #Training        
@@ -227,6 +242,10 @@ if __name__ =="__main__":
 
         print("Episode: {} step: {} #exploration: {:0.3f} epsilon: {:0.3f}".format(i+1,step, policy.num_exploration/policy.num_step,policy.epsilon))
         
+        if (i+1)%100 == 0:
+            step = test(policy, env)
+            print("Test step: ",step)
+            
         if np.mean(step_list[-10:]) >= max_step:
             break
         
@@ -236,22 +255,8 @@ if __name__ =="__main__":
     plt.show()
     
     
-    
-    
     # Test
-    policy.load_model(save_path)
-    state = env.reset()
-    state = np.reshape(state, [-1])      
-    step =0
-    for t in range(max_step):
-        env.render()
-        action = policy.get_action(state, True)
-        next_state, reward, done, _ = env.step(action)
-        
-        step +=1
-        state = next_state
-        if done:
-            break
+    step = test(policy, save_path, env, True)
     print("Test step: ", step)
 
     env.close()

@@ -157,6 +157,25 @@ class MLP(nn.Module):
         return self.layers(x)
     
 
+def test(policy, env, save_path=None,rendering=False):
+    if save_path != None:
+        policy.load_model(save_path)
+    state = env.reset()
+    state = np.reshape(state, [-1])      
+    max_step = env._max_episode_steps
+    step =0
+    with torch.no_grad():
+        for t in range(max_step):
+            if rendering == True:
+                env.render()
+            action = policy.get_action(state, True)
+            next_state, reward, done, _ = env.step(action)
+            
+            step +=1
+            state = next_state
+            if done:            
+                break
+    return step
 
 if __name__ =="__main__":
     device= 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -216,9 +235,14 @@ if __name__ =="__main__":
                 break
             
         step_list.append(step)
-
+        
 
         print("Episode: {} step: {} #exploration: {:0.3f} epsilon: {:0.3f}".format(i+1,step, policy.num_exploration/policy.num_step,policy.epsilon))
+        
+        if (i+1)%100 == 0:
+            step = test(policy, env)
+            print("Test step: ",step)
+            
         
         if np.mean(step_list[-10:]) >= max_step:
             break
@@ -232,19 +256,7 @@ if __name__ =="__main__":
     
     
     # Test
-    policy.load_model(save_path)
-    state = env.reset()
-    state = np.reshape(state, [-1])      
-    step =0
-    for t in range(max_step):
-        env.render()
-        action = policy.get_action(state, True)
-        next_state, reward, done, _ = env.step(action)
-        
-        step +=1
-        state = next_state
-        if done:
-            break
+    step = test(policy, save_path, env, True)
     print("Test step: ", step)
 
     env.close()

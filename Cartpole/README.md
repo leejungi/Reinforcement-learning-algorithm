@@ -28,6 +28,7 @@ Experience
 4. Exploration is important. Depending on exploration, DQN can learn within 250~3000 episode.
 
 # DDQN
+Update 2021-02-07: Prediction has problem(Q(n_s,n_a) is used not Q(s,a))
 Q(s,a) = DQN(s)  
 Q'(n_s,n_a) = Target_DQN(n_s)  
 loss = (Q(s,a) - TD_target)^2  
@@ -37,10 +38,11 @@ Pick action in model(Q) by argmax.
 This action index is used in target model Q value to pick action.
 
 Experience
-1. DDQN works with changing TD_target in 15DQN. But i don't know DDQN is better than DQN. Because it shows similar performance comparing to 15DQN. This may be affected by exploration. Because the result is different in every time.
+1. DDQN works with changing TD_target in 15DQN. 
+2. But i don't know DDQN is better than DQN. Because it shows similar performance comparing to 15DQN. This may be affected by exploration. Because the result is different in every time. ->  This may be caused by wrong prediction.
 
 # Result
 Comparing 13 DQN vs 15 DQN  
 15 DQN can learn 10000 step environment.   
-13 DQN is hard to learn 10000 but can learn 500 environment.
+13 DQN is hard to learn 10000 but can learn 500 environment.  
 
