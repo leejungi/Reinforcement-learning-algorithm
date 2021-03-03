@@ -256,7 +256,7 @@ if __name__ =="__main__":
     
     
     # Test
-    step = test(policy, save_path, env, True)
+    step = test(policy, env, save_path, True)
     print("Test step: ", step)
 
     env.close()
