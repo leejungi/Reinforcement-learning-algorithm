@@ -44,6 +44,9 @@ Experience
 # A2C
 Update 2021-03-09: Policy-based RL
 
+Experience  
+1. It is important to normalize returns and advantage function.
+
 # Result
 Comparing 13 DQN vs 15 DQN  
 15 DQN can learn 10000 step environment.   
