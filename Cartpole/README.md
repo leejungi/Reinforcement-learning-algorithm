@@ -41,8 +41,12 @@ Experience
 1. DDQN works with changing TD_target in 15DQN. 
 2. But i don't know DDQN is better than DQN. Because it shows similar performance comparing to 15DQN. This may be affected by exploration. Because the result is different in every time. ->  This may be caused by wrong prediction.
 
+# A2C
+Update 2021-03-09: Policy-based RL
+
 # Result
 Comparing 13 DQN vs 15 DQN  
 15 DQN can learn 10000 step environment.   
-13 DQN is hard to learn 10000 but can learn 500 environment.  
+13 DQN is hard to learn 10000 but can learn 500 environment. 
+
 
