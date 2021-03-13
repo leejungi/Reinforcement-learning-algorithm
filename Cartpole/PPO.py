@@ -10,6 +10,7 @@ import gym
 import matplotlib.pyplot as plt
 import copy
 from torch.distributions import Categorical
+from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 class DDQN:
 	def __init__(self,n_state, n_action, device='cpu'):
 		#params
@@ -28,8 +29,10 @@ class DDQN:
 		
 		#model define
 		#action-value function
-		self.model = MLP(self.n_state, self.n_action).to(self.device)		 
-		self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+		self.Actor= Actor(self.n_state, self.n_action).to(self.device)		 
+		self.Critic= Critic(self.n_state, 1).to(self.device)		 
+		self.actor_optimizer = torch.optim.Adam(self.Actor.parameters(), lr=1e-3)
+		self.critic_optimizer = torch.optim.Adam(self.Critic.parameters(), lr=3e-3)
 		
 		
 	def save_model(self, path):
@@ -39,47 +42,105 @@ class DDQN:
 		self.model.load_state_dict(torch.load(save_path))
 			
 	def get_action(self, state):
-		state=state.unsqueeze(0)
+		state = state.unsqueeze(0)
 		with torch.no_grad():
-			dist, _ = self.model(state)
-			dist = Categorical(dist)
-			action = dist.sample()
-			return action.item()
+			prob= self.Actor(state)
+		dist = Categorical(prob)
+		action = dist.sample()
+		return action.item(), prob[:,action.item()].item()
 	   
 	#Update
-	def train(self, states, actions, rewards):
+	def train(self, states, actions, rewards, probs):
 
-		#Compute Log probability
+
+		epochs = 10 
 		states = torch.stack(states, dim=0).to(self.device)
-		
-		dist, value = self.model(states)
-		dist = Categorical(dist)			
-		actions = torch.FloatTensor(actions).to(self.device)
-		log_prob = dist.log_prob(actions)
+		actions = torch.LongTensor(actions).to(self.device).view(-1,1)
 
-		#Compute Advantage
+		#Compute returns
 		returns = compute_returns(rewards) 
-		returns = torch.Tensor(returns).to(self.device)
+		returns = torch.FloatTensor(returns).to(self.device)
 
 		#Normalize
-		returns = (returns - returns.mean()) / (returns.std() + self.eps)
-		Advantage = returns - value
+#		returns = (returns - returns.mean()) / (returns.std() + self.eps)
 
-		Advantage = (Advantage - Advantage.mean()) /(Advantage.std() + self.eps)
+		#Compute Ratio
+		old_prob = torch.FloatTensor(probs).to(self.device).view(-1,1)
 
-		actor_loss = - (Advantage.detach() * log_prob).mean()
-		critic_loss = Advantage.pow(2.).mean()
 
-		entropy = dist.entropy().mean()
 
-		loss = actor_loss + 0.5* critic_loss + 0.01*entropy	
+		for n in range(epochs):
+			for index in BatchSampler(SubsetRandomSampler(range(len(rewards))), 32, False):
+				Q = returns[index].view(-1,1)
+				prob = self.Actor(states[index])
+				value = self.Critic(states[index])
 
-		self.optimizer.zero_grad()
-		loss.backward()
-		torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.6)
-		self.optimizer.step()
+				#Compute Log probability			
+				present_prob = prob.gather(1,actions[index])
 
-		
+
+				#Compute Advantage
+				A = Q - value
+				A = A.detach()
+
+#				Advantage = (Advantage - Advantage.mean()) /(Advantage.std() + self.eps)
+
+				ratio = (present_prob / old_prob[index])
+				ratio1 = ratio*A
+				ratio2 = torch.clamp(ratio, 1- 0.2, 1 + 0.2)*A
+				actor_loss = -torch.min(ratio1, ratio2).mean()
+#				critic_loss = Advantage.pow(2.).mean()
+
+#				dist = Categorical(prob)
+#				entropy = dist.entropy().mean()
+
+#				loss = actor_loss + 0.5* critic_loss + 0.01*entropy	
+
+				self.actor_optimizer.zero_grad()
+				actor_loss.backward()
+				torch.nn.utils.clip_grad_norm_(self.Actor.parameters(), 0.5)
+				self.actor_optimizer.step()
+				
+				critic_loss = torch.nn.functional.mse_loss(Q, value)					
+
+				self.critic_optimizer.zero_grad()
+				critic_loss.backward()
+				torch.nn.utils.clip_grad_norm_(self.Critic.parameters(), 0.5)
+				self.critic_optimizer.step()
+
+
+class Actor(nn.Module):
+	def __init__(self,n_state, n_action):
+		super(Actor, self).__init__()
+		self.layers = nn.Sequential(
+				nn.Linear(n_state, 100),
+				nn.ReLU()
+				)
+		self.actor = nn.Linear(100, n_action)
+		self.softmax = nn.Softmax(dim=1)
+
+	def forward(self, x):		 
+		x = self.layers(x)
+
+		actor_out = self.softmax(self.actor(x))
+		return actor_out
+			
+			
+class Critic(nn.Module):
+	def __init__(self,n_state, n_action):
+		super(Critic, self).__init__()
+		self.layers = nn.Sequential(
+				nn.Linear(n_state, 100),
+				nn.ReLU()
+				)
+		self.critic = nn.Linear(100, 1)
+
+	def forward(self, x):		 
+		x = self.layers(x)
+
+		critic_out = self.critic(x)
+		return critic_out
+
 		
 class MLP(nn.Module):
 	def __init__(self,n_state, n_action):
@@ -90,7 +151,7 @@ class MLP(nn.Module):
 				)
 		self.actor = nn.Linear(64, n_action)
 		self.critic = nn.Linear(64, 1)
-		self.softmax = nn.Softmax(dim=1)
+		self.softmax = nn.Softmax(dim=0)
 
 	def forward(self, x):		 
 		x = self.layers(x)
@@ -138,12 +199,12 @@ if __name__ =="__main__":
 	if device == 'cuda':		
 		torch.cuda.manual_seed_all(777)
 	
-	
 	env = gym.make('CartPole-v0')
-	
+
 	env._max_episode_steps = 10000
 	save_path='DDQN.pth'
 	num_episode = 5000
+	batch_size = 32
 	
 	
 	n_state = env.observation_space.shape[0]
@@ -156,8 +217,8 @@ if __name__ =="__main__":
 	avg_reward =[]
 	step_list = []
 
-	states, actions, rewards = [], [], []
-
+	states, actions, rewards, probs = [], [], [], []
+	train_count =0
 	#Training		 
 	for i in range(num_episode):
 		
@@ -172,7 +233,7 @@ if __name__ =="__main__":
 			
 
 			state = torch.Tensor(state).float().to(device)
-			action = policy.get_action(state)
+			action, action_prob = policy.get_action(state)
 			next_state, reward, done, _ = env.step(action)
 			
 			if done:
@@ -180,24 +241,27 @@ if __name__ =="__main__":
 			states.append(state)
 			actions.append(action)	
 			rewards.append(reward)
+			probs.append(action_prob)
+
 			
 			step += 1
+			train_count +=1
 
 			total_reward += reward
 			
 			state = next_state
-			
 				
 			if done:
 				break
-		
-		policy.train(states, actions, rewards)
+		if train_count >= 32:
+			train_count =0
+			policy.train(states, actions, rewards, probs)
 
+			states, actions, rewards, probs = [], [], [], []
 		avg_step.append(step)
 		avg_reward.append(total_reward)
 		step_list.append(step)
 
-		states, actions, rewards = [], [], []
 
 		
 		print(f"Episode: {i} step: {step}")

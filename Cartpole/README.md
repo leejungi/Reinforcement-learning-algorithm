@@ -47,6 +47,16 @@ Update 2021-03-09: Policy-based RL
 Experience  
 1. It is important to normalize returns and advantage function.
 
+# PPO
+Update 2021-03-10: 
+
+Experience
+1. r + gamma * V(st+1) can be converted into Rt.  
+2. Some people doesn't use GAE.  
+3. A2C needs normalizing reward and advantage but PPO may not need.  
+4. next_states has same information in states. so this variable should be removed
+5. With 1 step TD, PPO can be reached at 10,000 steps. But with GAE, it can't.
+
 # Result
 Comparing 13 DQN vs 15 DQN  
 15 DQN can learn 10000 step environment.   
