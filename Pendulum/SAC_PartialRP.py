@@ -42,7 +42,7 @@ class SAC:
 		self.action_space = action_space
 		action_space=None
 		if action_space == None:
-			self.action_scale = torch.tensor(1.)
+			self.action_scale = torch.tensor(2.)
 			self.action_bias= torch.tensor(0.)
 		else:
 			self.action_scale = torch.FloatTensor((self.action_space.high-self.action_space.low)/2.).to(self.device)
@@ -90,7 +90,7 @@ class SAC:
 		action = 2.*torch.tanh(dist.sample()).detach().cpu().numpy()
 
 		if evaluate == True:
-			return torch.tanh(mean)
+			return torch.tanh(mean)*2.
 		return action
 		   
 	#Update
@@ -116,13 +116,14 @@ class SAC:
 #			next_log_pi -= (2*(np.log(2) + resample - F.softplus(2*resample))).sum(axis=1)
 #			next_log_pi = next_log_pi.unsqueeze(1)
 
-			next_action = torch.tanh(resample) * self.action_scale + self.action_bias
-			next_log_pi = normal.log_prob(resample) - torch.log(self.action_scale*(1-next_action.pow(2))+ self.eps)
+			tanh_resample= torch.tanh(resample)
+			next_action = tanh_resample * self.action_scale + self.action_bias
+			next_log_pi = normal.log_prob(resample) - torch.log(self.action_scale*(1-tanh_resample.pow(2))+ self.eps)
 			next_log_pi = next_log_pi.sum(1, keepdim=True)
 
 			#Q update: Q(st, at) - (r - gamma*V(st+1)) 
-			next_Q1 = self.target_Critic1(next_states, next_action*2.)
-			next_Q2 = self.target_Critic2(next_states, next_action*2.)
+			next_Q1 = self.target_Critic1(next_states, next_action)
+			next_Q2 = self.target_Critic2(next_states, next_action)
 
 			#V(st+1) = Q(st,at) - alpha*logPi(at|st)
 			next_V = torch.min(next_Q1, next_Q2) - self.alpha * next_log_pi
@@ -154,12 +155,13 @@ class SAC:
 #		log_pi -= (2*(np.log(2) + resample - F.softplus(2*resample))).sum(axis=1)
 #		log_pi = log_pi.unsqueeze(1)
 	
-		pi_action = torch.tanh(resample)*self.action_scale + self.action_bias
-		log_pi = normal.log_prob(resample) - torch.log(self.action_scale*(1-pi_action.pow(2))+ self.eps)
+		tanh_resample= torch.tanh(resample)
+		pi_action = tanh_resample*self.action_scale + self.action_bias
+		log_pi = normal.log_prob(resample) - torch.log(self.action_scale*(1-tanh_resample.pow(2))+ self.eps)
 		log_pi = log_pi.sum(1, keepdim=True)
 
-		Q1 = self.Critic1(states, pi_action*2.)
-		Q2 = self.Critic1(states, pi_action*2.)
+		Q1 = self.Critic1(states, pi_action)
+		Q2 = self.Critic1(states, pi_action)
 		
 		#Actor update: mean(logPi(at|st) - Q(st,at))
 		actor_loss = (self.alpha*log_pi - torch.min(Q1,Q2)).mean()
@@ -327,7 +329,7 @@ if __name__ =="__main__":
 
 			if run_time > 10000:
 				T_state = torch.Tensor(state).float().to(device)
-				action = policy.get_action(T_state)*2.
+				action = policy.get_action(T_state)
 			else:
 				action = torch.FloatTensor(env.action_space.sample())
 			next_state, reward, done, _ = env.step(action)
@@ -342,13 +344,14 @@ if __name__ =="__main__":
 			
 			state = next_state
 				
+
+			if run_time > 1000 and run_time % 20 ==0:
+				for _ in range(20):
+					policy.train()
+					policy.sync()
+
 			if done:
 				break
-
-		if run_time > 1000 and run_time % 50 ==0:
-			for _ in range(50):
-				policy.train()
-				policy.sync()
 		avg_reward.append(total_reward/step)
 
 

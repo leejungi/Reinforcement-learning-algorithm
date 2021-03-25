@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.datasets as dsets
 import torchvision.transforms as transforms
 import torch.nn.init
-from collections import deque
+from collections import deque, namedtuple
 import numpy as np
 import random
 import gym
@@ -18,7 +18,7 @@ class DDQN:
 		self.n_action = n_action
 		self.device=device
 		self.discount_factor = 0.99
-		self.learning_rate=0.01#0.0003#0.01
+		self.learning_rate=0.01 #0.001
  
 		self.num_step =0
 		self.num_train = 0
@@ -26,6 +26,7 @@ class DDQN:
 
 		self.eps = torch.finfo(torch.float32).eps
 		
+		self.buffer =[] 
 		
 		#model define
 		#action-value function
@@ -42,94 +43,63 @@ class DDQN:
 		self.model.load_state_dict(torch.load(save_path))
 			
 	def get_action(self, state):
-		state = state.unsqueeze(0)
+		state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
 		with torch.no_grad():
 			prob= self.Actor(state)
 		dist = Categorical(prob)
 		action = dist.sample()
 		return action.item(), prob[:,action.item()].item()
-	   
+	def store_transition(self, transition):
+		self.buffer.append(transition)
+
 	#Update
-	def train(self, states, next_states, actions, rewards, masks, probs):
+	def train(self):
 
-		GAE =True 
-
-		train_epochs =10
-
-		next_states = torch.stack(next_states,dim=0).to(self.device)
-		states = torch.stack(states,dim=0).to(self.device)
-
-		actions = torch.LongTensor(actions).to(self.device).view(-1,1)
-		rewards = torch.FloatTensor(rewards).to(self.device).view(-1,1)
-		masks= torch.FloatTensor(masks).to(self.device).view(-1,1)
-
+		epochs = 10
 		
+		state = torch.FloatTensor([t.state for t in self.buffer]).to(self.device)
+		action = torch.LongTensor([t.action for t in self.buffer]).view(-1,1).to(self.device)
+
+		reward = [t.reward for t in self.buffer]
+		old_action_log_prob = torch.FloatTensor([t.a_log_prob for t in self.buffer]).view(-1,1).to(self.device)
 
 
-		#Compute Ratio
-		old_prob = torch.FloatTensor(probs).to(self.device).view(-1,1)
-
-		#Compute returns
-		with torch.no_grad():
-			TD_target= rewards + self.discount_factor * self.Critic(next_states) * masks
-			returns = (TD_target- self.Critic(states))
-#			returns= (returns- returns.mean()) /(returns.std() + self.eps)
-		#Compute Advantage
-		if GAE == True:
-			A = 0
-			Advantage = []
-			returns = returns.cpu().numpy()
-#			for step in reversed(range(len(rewards))):
-#				A = returns[step] + 0.95*0.99 * A
-#				Advantage.insert(0, A)
-			for delta_t in returns[::-1]:
-				A = 0.95 * 0.99 * A + delta_t[0]
-				Advantage.append([A])
-			Advantage.reverse()
-			Advantage= torch.FloatTensor(Advantage).to(self.device)
-
-		else:
-			Advantage = returns #(TD_target- self.Critic(states))
-		
-		
-		Advantage = Advantage.detach()
-#Advantage = (Advantage - Advantage.mean()) /(Advantage.std() + self.eps)
+		R = 0
+		Gt =[]
+		for r in reward[::-1]:
+			R = r + 0.99*R
+			Gt.insert(0,R)
+		Gt = torch.FloatTensor(Gt).to(self.device)
 
 
+		for n in range(epochs):
+			for index in BatchSampler(SubsetRandomSampler(range(len(self.buffer))), 32, False):
+				Gt_index = Gt[index].view(-1,1)
+				V = self.Critic(state[index])
+				delta = Gt_index -V
+				advantage = delta.detach()
 
-		for n in range(train_epochs):
-			for index in BatchSampler(SubsetRandomSampler(range(len(rewards))), 32, False):
-				Q = TD_target[index].view(-1,1)
-				prob = self.Actor(states[index])
-				value = self.Critic(states[index])
+				action_prob = self.Actor(state[index]).gather(1, action[index])
 
-				#Compute Log probability			
-				present_prob = prob.gather(1,actions[index])
+				ratio = (action_prob/old_action_log_prob[index])
+				surr1 = ratio*advantage
+				surr2 = torch.clamp(ratio, 1-0.2, 1+0.2) * advantage
 
+				actor_loss = -torch.min(surr1, surr2).mean()
 
-				A = Advantage[index]
-				#Compute Advantage
-
-
-				ratio = (present_prob / old_prob[index])
-				ratio1 = ratio*A
-				ratio2 = torch.clamp(ratio, 1- 0.2, 1 + 0.2)*A
-				actor_loss = -torch.min(ratio1, ratio2).mean()
-
-
-
+				
 				self.actor_optimizer.zero_grad()
 				actor_loss.backward()
 				torch.nn.utils.clip_grad_norm_(self.Actor.parameters(), 0.5)
 				self.actor_optimizer.step()
 				
-				critic_loss = torch.nn.functional.mse_loss(Q, value)					
+				critic_loss = torch.nn.functional.mse_loss(Gt_index, V)					
 
 				self.critic_optimizer.zero_grad()
 				critic_loss.backward()
 				torch.nn.utils.clip_grad_norm_(self.Critic.parameters(), 0.5)
 				self.critic_optimizer.step()
-
+		del self.buffer[:]
 
 class Actor(nn.Module):
 	def __init__(self,n_state, n_action):
@@ -217,15 +187,17 @@ if __name__ =="__main__":
 	
 	print("Run on ", device)
 	
-	torch.manual_seed(777)
+	seed = 1
+	torch.manual_seed(seed)
 	if device == 'cuda':		
-		torch.cuda.manual_seed_all(777)
+		torch.cuda.manual_seed_all(seed)
 	
-	env = gym.make('CartPole-v0')
+	env = gym.make('CartPole-v0').unwrapped
+	env.seed(seed)
 
 	env._max_episode_steps = 10000
 	save_path='DDQN.pth'
-	num_episode = 5000
+	num_episode = 1000
 	batch_size = 32
 	
 	
@@ -239,52 +211,40 @@ if __name__ =="__main__":
 	avg_reward =[]
 	step_list = []
 
-	states, next_states, actions, rewards, masks, probs = [], [], [], [], [], []
-	train_interval_ep =4
+	Transition = namedtuple('Transition', ['state', 'action', 'a_log_prob', 'reward', 'next_state'])
+	states, actions, rewards, probs = [], [], [], []
 	train_count =0
 	#Training		 
 	for i in range(num_episode):
 		
 		state = env.reset()
-		state = np.reshape(state, [-1])    
-		state = torch.Tensor(state).float().to(device)
 		
 
 		step = 0
 		total_reward=0
-		train_count +=1
 		for t in range(max_step):  
 			# env.render()
 			
-			states.append(state)
 
 			action, action_prob = policy.get_action(state)
 			next_state, reward, done, _ = env.step(action)
+
+			trans = Transition(state, action, action_prob, reward, next_state)
 			
-			if done:
-				reward = -100
+			policy.store_transition(trans)
 			
 			step += 1
 
 			total_reward += reward
 			
 			state = next_state
-			state = torch.Tensor(state).float().to(device)
-			mask = 1 if t == max_step-1 else float(not done) 
-
-			next_states.append(state)
-			actions.append(action)	
-			rewards.append(reward)
-			probs.append(action_prob)
-			masks.append(mask)
-			
+				
 			if done:
+				if len(policy.buffer) >=32: 
+					policy.train()
 				break
-		if train_count % train_interval_ep ==0:
-			train_count =0
-			policy.train(states, next_states, actions, rewards, masks, probs)
 
-			states, next_states, actions, rewards, masks, probs = [], [], [], [], [], []
+			states, actions, rewards, probs = [], [], [], []
 		avg_step.append(step)
 		avg_reward.append(total_reward)
 		step_list.append(step)

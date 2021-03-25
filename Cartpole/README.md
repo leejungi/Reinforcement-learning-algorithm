@@ -55,11 +55,13 @@ Experience
 2. Some people doesn't use GAE.  
 3. A2C needs normalizing reward and advantage but PPO may not need.  
 4. next_states has same information in states. so this variable should be removed
-5. With 1 step TD, PPO can be reached at 10,000 steps. But with GAE, it can't.
+5. With 1 step TD, PPO can be reached at 10,000 steps. ~~But with GAE, it can't.~~ GAE works but 1 step TD PPO has better performance and more stable.  
+6. There's some hyperparameter should be tuned for better performance such as learning rate, reward when done.
 
 # Result
 Comparing 13 DQN vs 15 DQN  
 15 DQN can learn 10000 step environment.   
 13 DQN is hard to learn 10000 but can learn 500 environment. 
+
 
 
