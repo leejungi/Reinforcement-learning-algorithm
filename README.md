@@ -17,3 +17,9 @@
 
 # Atari
 1. DDQN
+
+# Reference
+github
+1. [Other framework](https://github.com/rlcode/reinforcement-learning-kr)
+2. [PPO reference](https://github.com/4kasha/CartPole_PPO)
+3. [SAC reference](https://github.com/sweetice/Deep-reinforcement-learning-with-pytorch)
