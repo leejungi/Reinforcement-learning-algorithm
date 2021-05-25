@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import copy
 from torch.distributions import Categorical
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
-class DDQN:
+class PPO:
 	def __init__(self,n_state, n_action, device='cpu'):
 		#params
 		self.n_state = n_state
@@ -224,7 +224,7 @@ if __name__ =="__main__":
 	env = gym.make('CartPole-v0')
 
 	env._max_episode_steps = 10000
-	save_path='DDQN.pth'
+	save_path='PPO.pth'
 	num_episode = 5000
 	batch_size = 32
 	
@@ -234,7 +234,7 @@ if __name__ =="__main__":
 	max_step = env._max_episode_steps
 
 
-	policy = DDQN(n_state, n_action, device)
+	policy = PPO(n_state, n_action, device)
 	avg_step =[]
 	avg_reward =[]
 	step_list = []
